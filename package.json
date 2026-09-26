@@ -1,0 +1,18 @@
+{
+  "name": "auto-sync-vitepress-docs",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "VitePress + 외부 레포 마크다운 자동 동기화 + GitHub Pages 자동 배포",
+  "scripts": {
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "vitepress": "^1.6.4"
+  }
+}
