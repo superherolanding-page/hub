@@ -1,0 +1,87 @@
+name: Sync & Deploy VitePress Site
+
+on:
+  # 1. 이 레포지토리의 main 브랜치에 코드를 푸시할 때 실행
+  push:
+    branches: [main]
+  # 2. Pull Request가 열릴 때 미리보기 빌드 검증 (배포는 하지 않음)
+  pull_request:
+  # 3. 매일 자정(UTC 기준)에 외부 레포지토리를 확인하고 자동 동기화 실행
+  schedule:
+    - cron: '0 0 * * *'
+  # 4. GitHub 웹페이지에서 버튼을 눌러 수동으로 실행하고 싶을 때
+  workflow_dispatch:
+
+# GitHub Pages 배포를 위한 권한 설정
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 같은 브랜치에서 여러 워크플로우가 동시에 실행되지 않도록 함
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      # 1. 내 레포지토리 코드 가져오기
+      - name: Checkout my repo
+        uses: actions/checkout@v4
+
+      # 2. 외부 레포지토리(예: huggingface/blog) 클론 및 마크다운 복사
+      - name: Sync external markdown files
+        env:
+          EXTERNAL_REPO: huggingface/blog   # 동기화할 외부 레포 (여기서만 바꾸면 됩니다)
+        run: |
+          # 2-1. 외부 레포지토리를 'external_temp'라는 임시 폴더에 얕게(shallow) 클론
+          git clone --depth 1 "https://github.com/${EXTERNAL_REPO}.git" external_temp
+
+          # 2-2. VitePress에서 글을 보여줄 폴더 생성 (docs/posts)
+          mkdir -p docs/posts
+
+          # 2-3. 임시 폴더에서 마크다운(.md) 파일만 VitePress 폴더로 복사
+          cp -r external_temp/*.md docs/posts/ || true
+
+          # 2-4. 다 쓴 임시 폴더 삭제 (흔적 지우기 — 레포에 커밋되지 않음)
+          rm -rf external_temp
+
+      # 3. Node.js 환경 세팅
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm' # npm 설치 속도 향상을 위한 캐시
+
+      # 4. VitePress 및 패키지 설치
+      - name: Install dependencies
+        run: npm ci
+
+      # 5. VitePress 빌드 (가져온 마크다운들을 HTML로 변환)
+      #    base 경로는 리포 이름에 따라 자동으로 계산됨 (docs/.vitepress/config.mts 참조)
+      - name: Build VitePress
+        env:
+          REPO_NAME: ${{ github.event.repository.name }}
+          EXTERNAL_REPO: huggingface/blog
+        run: npm run docs:build
+
+      # 6. GitHub Pages 설정
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      # 7. 빌드된 결과물(dist 폴더)을 GitHub Pages용으로 업로드
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/.vitepress/dist # VitePress의 기본 빌드 결과물 경로
+
+      # 8. GitHub Pages에 최종 배포
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
