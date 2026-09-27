@@ -46,17 +46,21 @@ jobs:
           # 2-2. VitePress에서 글을 보여줄 폴더 생성 (docs/posts)
           mkdir -p docs/posts
 
-          # 2-3. 임시 폴더에서 마크다운(.md) 파일만 VitePress 폴더로 복사
-          cp -r external_temp/*.md docs/posts/ || true
+          # 2-3. 임시 폴더에서 마크다운(.md) 파일을 VitePress 폴더로 복사하되,
+          #      Vue 컴파일러가 깨지는 내용(미닫힌 HTML 태그, 대괄호 등)을 안전하게 치환
+          node scripts/sanitize-markdown.mjs external_temp docs/posts
 
           # 2-4. 다 쓴 임시 폴더 삭제 (흔적 지우기 — 레포에 커밋되지 않음)
           rm -rf external_temp
+
+          # 2-5. 동기화된 외부 문서가 실수로 커밋되지 않도록 gitignore 갱신
+          grep -qx 'docs/posts/' .gitignore 2>/dev/null || echo 'docs/posts/' >> .gitignore
 
       # 3. Node.js 환경 세팅
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm' # npm 설치 속도 향상을 위한 캐시
 
       # 4. VitePress 및 패키지 설치
